@@ -354,10 +354,13 @@ OUTPUT_FILES = {
 
 # ── Chart generation ──────────────────────────────────────────────────────────
 def generate_chart_for(script_id, ran_ids):
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    import numpy as np
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import numpy as np
+    except ImportError:
+        return None  # matplotlib not installed — skip chart generation
 
     PALETTE = {
         "blue":   "#5b7fff",
@@ -553,7 +556,8 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown('<div class="sidebar-label">Python interpreter</div>', unsafe_allow_html=True)
-    py_path = st.text_input("", value=sys.executable, label_visibility="collapsed")
+    # FIX 1: label must be non-empty; hidden via label_visibility="collapsed"
+    py_path = st.text_input("Python interpreter path", value=sys.executable, label_visibility="collapsed")
     st.markdown('<div class="sidebar-label" style="margin-top:0.75rem">Working directory</div>', unsafe_allow_html=True)
     st.code(str(BASE), language=None)
 
@@ -643,6 +647,8 @@ with tab_run:
                     chart_out = generate_chart_for(s["id"], st.session_state.ran_ids)
                     if chart_out:
                         log_lines.append(f"  chart generated: {chart_out}")
+                    else:
+                        log_lines.append(f"  chart skipped (matplotlib unavailable or no data)")
                     log_lines.append(f"  completed: {s['file']}")
                 else:
                     log_lines.append(f"  failed: {s['file']}")
