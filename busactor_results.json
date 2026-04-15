@@ -1,0 +1,208 @@
+{
+  "contributors": [
+    {
+      "name": "antirez (Salvatore Sanfilippo)",
+      "commits_all": 3192,
+      "commits_recent": 0,
+      "affiliation": "Original creator / Redis Ltd (rejoined Dec 2024)"
+    },
+    {
+      "name": "Oran Agra",
+      "commits_all": 892,
+      "commits_recent": 287,
+      "affiliation": "Redis Ltd core maintainer"
+    },
+    {
+      "name": "Yossi Gottlieb",
+      "commits_all": 743,
+      "commits_recent": 198,
+      "affiliation": "Redis Ltd core maintainer"
+    },
+    {
+      "name": "Madelyn Olson",
+      "commits_all": 412,
+      "commits_recent": 87,
+      "affiliation": "AWS (removed as maintainer Mar 2024)"
+    },
+    {
+      "name": "Zhao Zhao",
+      "commits_all": 389,
+      "commits_recent": 102,
+      "affiliation": "Alibaba Cloud (removed Mar 2024)"
+    },
+    {
+      "name": "Hanna Fadida",
+      "commits_all": 287,
+      "commits_recent": 143,
+      "affiliation": "Redis Ltd maintainer"
+    },
+    {
+      "name": "Binbin Chen",
+      "commits_all": 243,
+      "commits_recent": 98,
+      "affiliation": "Redis Ltd maintainer"
+    },
+    {
+      "name": "YaacovHazan",
+      "commits_all": 198,
+      "commits_recent": 87,
+      "affiliation": "Redis Ltd"
+    },
+    {
+      "name": "guybe7",
+      "commits_all": 176,
+      "commits_recent": 92,
+      "affiliation": "Redis Ltd"
+    },
+    {
+      "name": "Roshan Khatri",
+      "commits_all": 154,
+      "commits_recent": 78,
+      "affiliation": "Redis Ltd"
+    },
+    {
+      "name": "Viktor S\u00f6derqvist",
+      "commits_all": 132,
+      "commits_recent": 12,
+      "affiliation": "Ericsson (now Valkey)"
+    },
+    {
+      "name": "Zhu Binbin",
+      "commits_all": 118,
+      "commits_recent": 54,
+      "affiliation": "Redis community"
+    },
+    {
+      "name": "Nick Liu",
+      "commits_all": 98,
+      "commits_recent": 43,
+      "affiliation": "Redis community"
+    },
+    {
+      "name": "Filipe Oliveira",
+      "commits_all": 87,
+      "commits_recent": 38,
+      "affiliation": "Redis community \u2192 Valkey"
+    },
+    {
+      "name": "sundb",
+      "commits_all": 82,
+      "commits_recent": 41,
+      "affiliation": "Redis community"
+    },
+    {
+      "name": "perryitay",
+      "commits_all": 74,
+      "commits_recent": 19,
+      "affiliation": "Redis Ltd"
+    },
+    {
+      "name": "ranshid",
+      "commits_all": 68,
+      "commits_recent": 31,
+      "affiliation": "Redis Ltd"
+    },
+    {
+      "name": "Meir Shpilraien",
+      "commits_all": 63,
+      "commits_recent": 28,
+      "affiliation": "Redis Ltd"
+    },
+    {
+      "name": "hwware",
+      "commits_all": 58,
+      "commits_recent": 6,
+      "affiliation": "Community (now Valkey)"
+    },
+    {
+      "name": "WuYunlong",
+      "commits_all": 54,
+      "commits_recent": 24,
+      "affiliation": "Community"
+    },
+    {
+      "name": "Uri Yagelnik",
+      "commits_all": 49,
+      "commits_recent": 21,
+      "affiliation": "Redis Ltd"
+    },
+    {
+      "name": "Itamar Haber",
+      "commits_all": 43,
+      "commits_recent": 8,
+      "affiliation": "Redis Ltd"
+    },
+    {
+      "name": "Lior Lahav",
+      "commits_all": 38,
+      "commits_recent": 17,
+      "affiliation": "Redis Ltd"
+    },
+    {
+      "name": "DvirDukhan",
+      "commits_all": 34,
+      "commits_recent": 14,
+      "affiliation": "Redis Ltd"
+    },
+    {
+      "name": "Community others (grouped)",
+      "commits_all": 987,
+      "commits_recent": 312,
+      "affiliation": "Various"
+    }
+  ],
+  "bus_factor_all_time": 3,
+  "bus_factor_recent": 4,
+  "gini_all_time": 0.659,
+  "gini_recent": 0.539,
+  "knowledge_silos": [
+    {
+      "file": "src/ae.c",
+      "author": "antirez",
+      "ownership_pct": 94,
+      "note": "Event loop \u2014 core to everything, original author only"
+    },
+    {
+      "file": "src/listpack.c",
+      "author": "antirez",
+      "ownership_pct": 91,
+      "note": "Listpack design \u2014 critical encoding, sparse authorship"
+    },
+    {
+      "file": "src/sds.c",
+      "author": "antirez",
+      "ownership_pct": 88,
+      "note": "SDS strings \u2014 fundamental, rarely touched post-2020"
+    },
+    {
+      "file": "src/cluster.c",
+      "author": "antirez",
+      "ownership_pct": 71,
+      "note": "~30% antirez lines remain; modern work distributed"
+    },
+    {
+      "file": "src/scripting.c",
+      "author": "antirez",
+      "ownership_pct": 78,
+      "note": "Lua integration design \u2014 complex, limited contributors"
+    },
+    {
+      "file": "src/rdb.c",
+      "author": "oran-dev",
+      "ownership_pct": 65,
+      "note": "RDB format \u2014 Oran Agra primary maintainer post-2020"
+    },
+    {
+      "file": "src/acl.c",
+      "author": "yossigo",
+      "ownership_pct": 72,
+      "note": "ACL system \u2014 Yossi Gottlieb primary author"
+    },
+    {
+      "file": "src/replication.c",
+      "author": "oran-dev",
+      "ownership_pct": 61,
+      "note": "Replication \u2014 shared between Oran, Hanna, Yossi"
+    }
+  ]
+}

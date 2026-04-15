@@ -1,0 +1,215 @@
+{
+  "coverage": [
+    {
+      "module": "server.c",
+      "c_sloc": 8451,
+      "has_test": true,
+      "test_sloc": 1820
+    },
+    {
+      "module": "cluster.c",
+      "c_sloc": 6823,
+      "has_test": true,
+      "test_sloc": 3140
+    },
+    {
+      "module": "t_zset.c",
+      "c_sloc": 4912,
+      "has_test": true,
+      "test_sloc": 2890
+    },
+    {
+      "module": "rdb.c",
+      "c_sloc": 4201,
+      "has_test": true,
+      "test_sloc": 1240
+    },
+    {
+      "module": "aof.c",
+      "c_sloc": 3891,
+      "has_test": true,
+      "test_sloc": 980
+    },
+    {
+      "module": "networking.c",
+      "c_sloc": 3710,
+      "has_test": true,
+      "test_sloc": 720
+    },
+    {
+      "module": "replication.c",
+      "c_sloc": 3412,
+      "has_test": true,
+      "test_sloc": 1680
+    },
+    {
+      "module": "module.c",
+      "c_sloc": 5821,
+      "has_test": true,
+      "test_sloc": 1140
+    },
+    {
+      "module": "config.c",
+      "c_sloc": 3102,
+      "has_test": true,
+      "test_sloc": 1420
+    },
+    {
+      "module": "acl.c",
+      "c_sloc": 2987,
+      "has_test": true,
+      "test_sloc": 890
+    },
+    {
+      "module": "scripting.c",
+      "c_sloc": 2841,
+      "has_test": true,
+      "test_sloc": 1980
+    },
+    {
+      "module": "sentinel.c",
+      "c_sloc": 3124,
+      "has_test": true,
+      "test_sloc": 2240
+    },
+    {
+      "module": "t_string.c",
+      "c_sloc": 1123,
+      "has_test": true,
+      "test_sloc": 640
+    },
+    {
+      "module": "t_list.c",
+      "c_sloc": 1298,
+      "has_test": true,
+      "test_sloc": 720
+    },
+    {
+      "module": "t_hash.c",
+      "c_sloc": 1432,
+      "has_test": true,
+      "test_sloc": 580
+    },
+    {
+      "module": "t_set.c",
+      "c_sloc": 1611,
+      "has_test": true,
+      "test_sloc": 690
+    },
+    {
+      "module": "ae.c",
+      "c_sloc": 1312,
+      "has_test": false,
+      "test_sloc": 0
+    },
+    {
+      "module": "dict.c",
+      "c_sloc": 1654,
+      "has_test": false,
+      "test_sloc": 0
+    },
+    {
+      "module": "sds.c",
+      "c_sloc": 892,
+      "has_test": false,
+      "test_sloc": 0
+    },
+    {
+      "module": "listpack.c",
+      "c_sloc": 734,
+      "has_test": false,
+      "test_sloc": 0
+    },
+    {
+      "module": "zmalloc.c",
+      "c_sloc": 412,
+      "has_test": false,
+      "test_sloc": 0
+    },
+    {
+      "module": "bio.c",
+      "c_sloc": 521,
+      "has_test": false,
+      "test_sloc": 0
+    }
+  ],
+  "security_surface": [
+    {
+      "vector": "Lua scripting (EVAL)",
+      "component": "scripting.c, t_string.c",
+      "severity": "Critical",
+      "mitigation": "Sandbox; disable EVAL; ACL restrictions"
+    },
+    {
+      "vector": "Integer overflow in commands",
+      "component": "t_zset.c, t_set.c, t_hash.c",
+      "severity": "High",
+      "mitigation": "Bound checking patches; upgrade to patched version"
+    },
+    {
+      "vector": "Cluster bus exposure",
+      "component": "cluster.c",
+      "severity": "High",
+      "mitigation": "Firewall cluster bus port (+10000); auth"
+    },
+    {
+      "vector": "AOF/RDB injection",
+      "component": "aof.c, rdb.c",
+      "severity": "Medium",
+      "mitigation": "File permission controls; encrypted persistence"
+    },
+    {
+      "vector": "CONFIG SET write access",
+      "component": "config.c",
+      "severity": "Medium",
+      "mitigation": "Rename/disable CONFIG in production; ACL restrictions"
+    },
+    {
+      "vector": "RESP protocol injection",
+      "component": "networking.c",
+      "severity": "Medium",
+      "mitigation": "TLS; network isolation; no anonymous access"
+    },
+    {
+      "vector": "ACL bypass via edge cases",
+      "component": "acl.c",
+      "severity": "Medium",
+      "mitigation": "Regular ACL audits; upgrade to latest patch"
+    },
+    {
+      "vector": "Module API misuse",
+      "component": "module.c",
+      "severity": "Low-Medium",
+      "mitigation": "Only load trusted modules; module sandboxing"
+    },
+    {
+      "vector": "Memory allocation failure",
+      "component": "zmalloc.c",
+      "severity": "Low",
+      "mitigation": "OOM handling; maxmemory policy"
+    },
+    {
+      "vector": "Pattern matching ReDoS",
+      "component": "t_string.c, db.c",
+      "severity": "Low",
+      "mitigation": "Avoid KEYS * in production; use SCAN"
+    }
+  ],
+  "cve_by_component": {
+    "Lua / scripting.c": 9,
+    "Integer overflow (various)": 12,
+    "networking.c / RESP": 5,
+    "cluster.c": 4,
+    "rdb.c / aof.c": 4,
+    "config.c": 3,
+    "t_zset / t_set / t_hash": 4,
+    "HyperLogLog / listpack": 3
+  },
+  "summary": {
+    "total_c_sloc": 64264,
+    "total_test_sloc": 22770,
+    "test_ratio_pct": 35.4,
+    "modules_with_tests": 16,
+    "modules_without_tests": 6
+  }
+}

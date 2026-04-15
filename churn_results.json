@@ -1,0 +1,225 @@
+{
+  "churn_data": [
+    {
+      "file": "src/cluster.c",
+      "commits": 287,
+      "sloc": 6823,
+      "complexity": 1854,
+      "hotspot": 77.99
+    },
+    {
+      "file": "src/server.c",
+      "commits": 312,
+      "sloc": 8451,
+      "complexity": 2103,
+      "hotspot": 77.64
+    },
+    {
+      "file": "src/networking.c",
+      "commits": 187,
+      "sloc": 3710,
+      "complexity": 834,
+      "hotspot": 42.04
+    },
+    {
+      "file": "src/config.c",
+      "commits": 198,
+      "sloc": 3102,
+      "complexity": 643,
+      "hotspot": 41.04
+    },
+    {
+      "file": "src/replication.c",
+      "commits": 176,
+      "sloc": 3412,
+      "complexity": 756,
+      "hotspot": 39.0
+    },
+    {
+      "file": "src/rdb.c",
+      "commits": 143,
+      "sloc": 4201,
+      "complexity": 987,
+      "hotspot": 33.6
+    },
+    {
+      "file": "src/acl.c",
+      "commits": 154,
+      "sloc": 2987,
+      "complexity": 621,
+      "hotspot": 32.02
+    },
+    {
+      "file": "src/aof.c",
+      "commits": 138,
+      "sloc": 3891,
+      "complexity": 876,
+      "hotspot": 31.07
+    },
+    {
+      "file": "src/t_zset.c",
+      "commits": 122,
+      "sloc": 4912,
+      "complexity": 1231,
+      "hotspot": 30.57
+    },
+    {
+      "file": "src/scripting.c",
+      "commits": 117,
+      "sloc": 2841,
+      "complexity": 589,
+      "hotspot": 24.26
+    },
+    {
+      "file": "src/debug.c",
+      "commits": 98,
+      "sloc": 2210,
+      "complexity": 412,
+      "hotspot": 18.27
+    },
+    {
+      "file": "src/db.c",
+      "commits": 87,
+      "sloc": 1654,
+      "complexity": 324,
+      "hotspot": 17.04
+    },
+    {
+      "file": "src/t_hash.c",
+      "commits": 76,
+      "sloc": 1432,
+      "complexity": 289,
+      "hotspot": 15.34
+    },
+    {
+      "file": "src/object.c",
+      "commits": 94,
+      "sloc": 1823,
+      "complexity": 287,
+      "hotspot": 14.8
+    },
+    {
+      "file": "src/t_set.c",
+      "commits": 71,
+      "sloc": 1611,
+      "complexity": 312,
+      "hotspot": 13.75
+    },
+    {
+      "file": "src/t_list.c",
+      "commits": 65,
+      "sloc": 1298,
+      "complexity": 244,
+      "hotspot": 12.22
+    },
+    {
+      "file": "src/sentinel.c",
+      "commits": 58,
+      "sloc": 3124,
+      "complexity": 543,
+      "hotspot": 10.08
+    },
+    {
+      "file": "src/module.c",
+      "commits": 63,
+      "sloc": 5821,
+      "complexity": 876,
+      "hotspot": 9.48
+    },
+    {
+      "file": "src/ae.c",
+      "commits": 32,
+      "sloc": 1312,
+      "complexity": 198,
+      "hotspot": 4.83
+    },
+    {
+      "file": "src/dict.c",
+      "commits": 28,
+      "sloc": 1654,
+      "complexity": 234,
+      "hotspot": 3.96
+    },
+    {
+      "file": "src/sds.c",
+      "commits": 21,
+      "sloc": 892,
+      "complexity": 87,
+      "hotspot": 2.05
+    },
+    {
+      "file": "src/listpack.c",
+      "commits": 18,
+      "sloc": 734,
+      "complexity": 76,
+      "hotspot": 1.86
+    },
+    {
+      "file": "src/zmalloc.c",
+      "commits": 12,
+      "sloc": 412,
+      "complexity": 34,
+      "hotspot": 0.99
+    }
+  ],
+  "commit_types": {
+    "Bug Fix": 148,
+    "Feature": 187,
+    "Refactor": 89,
+    "Test": 43,
+    "Docs": 19,
+    "Performance": 14
+  },
+  "releases": [
+    {
+      "version": "6.2.0",
+      "date": "2021-02-22",
+      "gap": null
+    },
+    {
+      "version": "7.0.0",
+      "date": "2022-04-27",
+      "gap": "14.2 months"
+    },
+    {
+      "version": "7.0.5",
+      "date": "2022-09-26",
+      "gap": "5 months (patch)"
+    },
+    {
+      "version": "7.2.0",
+      "date": "2023-07-10",
+      "gap": "14.4 months"
+    },
+    {
+      "version": "7.2.4",
+      "date": "2024-01-09",
+      "gap": "6 months (patch)"
+    },
+    {
+      "version": "7.4.0",
+      "date": "2024-07-16",
+      "gap": "6.2 months"
+    },
+    {
+      "version": "8.0.0",
+      "date": "2025-05-01",
+      "gap": "9.5 months"
+    }
+  ],
+  "cve_by_year": {
+    "2019": 4,
+    "2020": 6,
+    "2021": 9,
+    "2022": 11,
+    "2023": 14,
+    "2024": 8
+  },
+  "cve_by_type": {
+    "Integer Overflow / Heap Overflow": 18,
+    "Lua Scripting RCE": 7,
+    "Denial of Service": 9,
+    "Off-by-One / Buffer Issues": 6,
+    "Other": 4
+  }
+}
