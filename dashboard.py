@@ -384,12 +384,19 @@ def generate_chart_for(script_id):
         else:
             return None, f"no chart generator for {script_id}"
 
-        fig.savefig(BASE / out_file, facecolor=DARK_BG, bbox_inches="tight")
+        out_path = BASE / out_file
+        fig.savefig(str(out_path), facecolor=DARK_BG, bbox_inches="tight")
         plt.close(fig)
+
+        # Verify file was actually written
+        if not out_path.exists() or out_path.stat().st_size == 0:
+            return None, f"chart file was not written: {out_path}"
+
         return out_file, None
 
     except Exception as e:
-        return None, str(e)
+        import traceback
+        return None, f"{e}\n{traceback.format_exc()}"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def _load_json(fname):
@@ -403,6 +410,17 @@ def load_json_gated(fname, script_id):
     if script_id not in st.session_state.ran_ids:
         return None
     return _load_json(fname)
+
+def _read_image_bytes(path):
+    """Read image as raw bytes — bypasses Streamlit's widget cache so newly
+    written files always appear without a second rerun."""
+    with open(str(path), "rb") as f:
+        return f.read()
+
+def _read_file_bytes(path):
+    """Read any file as raw bytes."""
+    with open(str(path), "rb") as f:
+        return f.read()
 
 def delete_all_outputs():
     for files in OUTPUT_FILES.values():
@@ -424,6 +442,11 @@ def run_script(script_info, py=sys.executable):
 if "run_log"  not in st.session_state: st.session_state.run_log  = []
 if "statuses" not in st.session_state: st.session_state.statuses = {s["id"]: "idle" for s in SCRIPTS}
 if "ran_ids"  not in st.session_state: st.session_state.ran_ids  = set()
+# Store chart bytes in session state so they survive reruns without re-reading disk
+if "chart_bytes"  not in st.session_state: st.session_state.chart_bytes  = {}
+# Store PDF bytes in session state
+if "pdf_bytes"    not in st.session_state: st.session_state.pdf_bytes    = None
+if "pdf_size_kb"  not in st.session_state: st.session_state.pdf_size_kb  = 0
 
 if "initialised" not in st.session_state:
     delete_all_outputs()
@@ -451,9 +474,12 @@ with st.sidebar:
     st.code(str(BASE), language=None)
 
     if st.button("Clear and Reset", use_container_width=True):
-        st.session_state.run_log  = []
-        st.session_state.statuses = {s["id"]: "idle" for s in SCRIPTS}
-        st.session_state.ran_ids  = set()
+        st.session_state.run_log    = []
+        st.session_state.statuses   = {s["id"]: "idle" for s in SCRIPTS}
+        st.session_state.ran_ids    = set()
+        st.session_state.chart_bytes = {}
+        st.session_state.pdf_bytes  = None
+        st.session_state.pdf_size_kb = 0
         delete_all_outputs()
         st.rerun()
 
@@ -514,6 +540,11 @@ with tab_run:
                 if chart_file:
                     p = BASE / chart_file
                     if p.exists(): p.unlink()
+                    # Remove cached bytes for this chart
+                    st.session_state.chart_bytes.pop(s["id"], None)
+                if s["id"] == "report":
+                    st.session_state.pdf_bytes   = None
+                    st.session_state.pdf_size_kb = 0
                 st.session_state.ran_ids.discard(s["id"])
                 st.session_state.statuses[s["id"]] = "running"
 
@@ -533,13 +564,29 @@ with tab_run:
 
                 if ok:
                     st.session_state.ran_ids.add(s["id"])
-                    # Generate chart for analysis scripts (not report)
-                    if s["id"] != "report":
+
+                    if s["id"] == "report":
+                        # ── Read PDF bytes immediately into session state ──────
+                        pdf_path = BASE / "redis_architecture_report.pdf"
+                        if pdf_path.exists() and pdf_path.stat().st_size > 0:
+                            st.session_state.pdf_bytes   = _read_file_bytes(pdf_path)
+                            st.session_state.pdf_size_kb = pdf_path.stat().st_size / 1024
+                            log_lines.append(f"  PDF ready: {st.session_state.pdf_size_kb:.0f} KB")
+                        else:
+                            log_lines.append("  WARNING: PDF file not found or empty after build_report.py ran")
+                    else:
+                        # ── Generate chart and read bytes into session state ───
                         chart_out, chart_err = generate_chart_for(s["id"])
                         if chart_out:
-                            log_lines.append(f"  chart generated: {chart_out}")
+                            chart_path = BASE / chart_out
+                            if chart_path.exists():
+                                st.session_state.chart_bytes[s["id"]] = _read_image_bytes(chart_path)
+                                log_lines.append(f"  chart generated: {chart_out}")
+                            else:
+                                log_lines.append(f"  chart file missing after generation: {chart_out}")
                         elif chart_err:
                             log_lines.append(f"  chart skipped: {chart_err}")
+
                     log_lines.append(f"  completed: {s['file']}")
                 else:
                     log_lines.append(f"  FAILED: {s['file']}")
@@ -723,7 +770,7 @@ with tab_results:
         placeholder("script 07 — Bus Factor and Contributor Concentration")
 
 # ══════════════════════════════════════════════════════════
-# TAB 3 — CHARTS (all 7 analysis scripts)
+# TAB 3 — CHARTS
 # ══════════════════════════════════════════════════════════
 with tab_charts:
     st.markdown('<div class="section-header">Generated Figures</div>', unsafe_allow_html=True)
@@ -731,13 +778,14 @@ with tab_charts:
     col1, col2 = st.columns(2)
     for i, (src_id, fname) in enumerate(SCRIPT_CHART_MAP.items()):
         col = col1 if i % 2 == 0 else col2
-        path = BASE / fname
         caption = CHART_CAPTIONS.get(fname, fname)
         script_title = next((s["title"] for s in SCRIPTS if s["id"] == src_id), src_id)
 
         with col:
-            if src_id in st.session_state.ran_ids and path.exists():
-                st.image(str(path), use_container_width=True)
+            # ── FIX: serve from session_state bytes, not disk path ─────────────
+            img_bytes = st.session_state.chart_bytes.get(src_id)
+            if src_id in st.session_state.ran_ids and img_bytes:
+                st.image(img_bytes, use_container_width=True)
                 st.markdown(f'<div class="img-caption">{caption}</div>', unsafe_allow_html=True)
             else:
                 label = caption.split("—")[1].strip() if "—" in caption else caption
@@ -756,32 +804,34 @@ with tab_charts:
 with tab_report:
     st.markdown('<div class="section-header">PDF Report</div>', unsafe_allow_html=True)
 
-    pdf_path = BASE / "redis_architecture_report.pdf"
+    # ── FIX: serve from session_state bytes, not live disk path ───────────────
+    pdf_bytes   = st.session_state.pdf_bytes
+    pdf_size_kb = st.session_state.pdf_size_kb
 
-    if "report" in st.session_state.ran_ids and pdf_path.exists():
-        size_kb = pdf_path.stat().st_size / 1024
+    if "report" in st.session_state.ran_ids and pdf_bytes:
         st.markdown(f"""
         <div class="script-card" style="display:flex;align-items:center;gap:1.5rem;padding:1.5rem">
             <div style="flex:1;min-width:0">
                 <div class="script-title" style="font-size:1rem">redis_architecture_report.pdf</div>
                 <div class="script-desc" style="margin-top:0.3rem">
-                    10-page architecture analysis &nbsp;&middot;&nbsp; {size_kb:.0f} KB
+                    10-page architecture analysis &nbsp;&middot;&nbsp; {pdf_size_kb:.0f} KB
                 </div>
                 <div class="script-output-tag" style="margin-top:0.6rem">
                     Stakeholders &nbsp;&middot;&nbsp; Context View &nbsp;&middot;&nbsp; 7 Metric Sections &nbsp;&middot;&nbsp; Insights &nbsp;&middot;&nbsp; References
                 </div>
             </div>
         </div>""", unsafe_allow_html=True)
-        with open(pdf_path, "rb") as f:
-            st.download_button(
-                "Download PDF Report", f.read(),
-                "redis_architecture_report.pdf", "application/pdf",
-                use_container_width=True)
+        st.download_button(
+            "Download PDF Report",
+            pdf_bytes,
+            "redis_architecture_report.pdf",
+            "application/pdf",
+            use_container_width=True,
+        )
     else:
-        missing_pdf = not pdf_path.exists()
         not_run = "report" not in st.session_state.ran_ids
         hint = "Run script 08 — Build PDF Report to generate it." if not_run else \
-               f"Report script ran but PDF file was not created. Check the terminal output for errors."
+               "Report script ran but the PDF was not created. Check the terminal output for errors."
         st.markdown(f"""
         <div class="placeholder-box" style="padding:3.5rem 2rem">
             <div style="color:#252840;font-size:0.82rem;margin-bottom:0.4rem">No PDF built yet</div>
