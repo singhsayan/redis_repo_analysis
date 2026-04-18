@@ -1,5 +1,5 @@
 import streamlit as st
-import subprocess, sys, os, json, math
+import subprocess, sys, os, json, math, io
 from pathlib import Path
 
 BASE = Path(__file__).parent
@@ -90,7 +90,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ── ALL 7 scripts (01-04 analysis + 05-07 new metrics + report) ──────────────
+# ── Script definitions ────────────────────────────────────────────────────────
 SCRIPTS = [
     {"id": "loc",        "file": "01_loc_metrics.py",       "title": "01 · Lines of Code & COCOMO",
      "desc": "Counts source lines, comments, blanks per language. Estimates effort via COCOMO.",
@@ -118,7 +118,6 @@ SCRIPTS = [
      "output": "redis_architecture_report.pdf"},
 ]
 
-# Maps each analysis script to the chart it produces
 SCRIPT_CHART_MAP = {
     "loc":        "fig1_loc_breakdown.png",
     "complexity": "fig2_cc_distribution.png",
@@ -150,19 +149,20 @@ OUTPUT_FILES = {
     "report":     ["redis_architecture_report.pdf"],
 }
 
-# ── Chart generation — one per script, generated immediately after run ────────
-def generate_chart_for(script_id):
+# ── KEY FIX: render charts into BytesIO — zero disk I/O, zero race condition ─
+def generate_chart_bytes(script_id):
+    """Renders the matplotlib chart for script_id and returns raw PNG bytes.
+    Never writes to disk, so it works identically on local and deployed envs."""
+    fig = None
     try:
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import numpy as np
     except ImportError:
-        return None, "matplotlib not installed — run: pip install matplotlib"
+        return None, "matplotlib not installed"
 
     DARK_BG = "#10131a"
-    DARK_AX = "#0d0f14"
-
     plt.rcParams.update({
         "font.family":      "DejaVu Sans",
         "figure.dpi":       150,
@@ -183,13 +183,11 @@ def generate_chart_for(script_id):
         "legend.facecolor": "#1a1e2e",
         "legend.edgecolor": "#2a2e45",
     })
-
     P = {"blue":"#5b7fff","indigo":"#818cf8","teal":"#2dd4bf","slate":"#64748b",
          "muted":"#334155","amber":"#f59e0b","red":"#f87171","green":"#4ade80",
          "purple":"#a78bfa","orange":"#fb923c"}
 
-    out_file = SCRIPT_CHART_MAP.get(script_id)
-    if not out_file:
+    if script_id not in SCRIPT_CHART_MAP:
         return None, "no chart mapped for this script"
 
     try:
@@ -215,7 +213,7 @@ def generate_chart_for(script_id):
             ax.grid(axis="y", linestyle="--", alpha=0.35)
             fig.tight_layout()
 
-        # ── Fig 2: CC distribution ─────────────────────────────────────────────
+        # ── Fig 2: CC distribution ────────────────────────────────────────────
         elif script_id == "complexity":
             data = _load_json("complexity_results.json")
             if not data: return None, "complexity_results.json not found"
@@ -234,7 +232,7 @@ def generate_chart_for(script_id):
             ax.grid(axis="y", linestyle="--", alpha=0.3)
             fig.tight_layout()
 
-        # ── Fig 3: Issue velocity ──────────────────────────────────────────────
+        # ── Fig 3: Issue velocity ─────────────────────────────────────────────
         elif script_id == "velocity":
             ISSUES = {"2022-01":52,"2022-04":61,"2022-07":48,"2022-10":66,
                       "2023-01":67,"2023-04":69,"2023-07":55,"2023-10":76,
@@ -247,7 +245,7 @@ def generate_chart_for(script_id):
             labels = sorted(ISSUES.keys())
             x = np.arange(len(labels))
             fig, ax = plt.subplots(figsize=(9,3.8))
-            ax.plot(x,[ISSUES[l] for l in labels],"o-",color=P["blue"],  label="Issues opened",linewidth=2,markersize=4)
+            ax.plot(x,[ISSUES[l] for l in labels],"o-",color=P["blue"],label="Issues opened",linewidth=2,markersize=4)
             ax.plot(x,[PRS.get(l,0) for l in labels],"s--",color=P["indigo"],label="PRs merged",linewidth=2,markersize=4)
             idx_lc = labels.index("2024-03")
             ax.axvline(x=idx_lc,color=P["amber"],linestyle="--",alpha=0.6,linewidth=1.2)
@@ -259,7 +257,7 @@ def generate_chart_for(script_id):
             ax.grid(axis="y",linestyle="--",alpha=0.3)
             fig.tight_layout()
 
-        # ── Fig 4: Coupling scatter ────────────────────────────────────────────
+        # ── Fig 4: Coupling scatter ───────────────────────────────────────────
         elif script_id == "coupling":
             data = _load_json("coupling_results.json")
             if not data: return None, "coupling_results.json not found"
@@ -284,7 +282,7 @@ def generate_chart_for(script_id):
             ax.grid(linestyle="--",alpha=0.2)
             fig.tight_layout()
 
-        # ── Fig 5: Churn hotspot scatter ───────────────────────────────────────
+        # ── Fig 5: Churn hotspot ──────────────────────────────────────────────
         elif script_id == "churn":
             data = _load_json("churn_results.json")
             if not data: return None, "churn_results.json not found"
@@ -308,7 +306,7 @@ def generate_chart_for(script_id):
             ax.grid(linestyle="--",alpha=0.2)
             fig.tight_layout()
 
-        # ── Fig 6: Test coverage dual-axis bar ─────────────────────────────────
+        # ── Fig 6: Test coverage ──────────────────────────────────────────────
         elif script_id == "coverage":
             data = _load_json("coverage_results.json")
             if not data: return None, "coverage_results.json not found"
@@ -326,7 +324,8 @@ def generate_chart_for(script_id):
             ax1.bar(x+0.2,tsloc,0.35,label="Test SLOC",color=P["green"],alpha=0.8)
             ax2.plot(x,ratios,"o--",color=P["red"],linewidth=1.5,markersize=5,label="Test ratio %")
             ax1.set_xticks(x); ax1.set_xticklabels(mods,rotation=35,ha="right",fontsize=7.5)
-            ax1.set_ylabel("Lines of Code",color="#64748b"); ax2.set_ylabel("Test/Code Ratio (%)",color=P["red"])
+            ax1.set_ylabel("Lines of Code",color="#64748b")
+            ax2.set_ylabel("Test/Code Ratio (%)",color=P["red"])
             ax1.set_title("Test coverage: source vs test SLOC by module")
             lines1,labels1=ax1.get_legend_handles_labels()
             lines2,labels2=ax2.get_legend_handles_labels()
@@ -335,7 +334,7 @@ def generate_chart_for(script_id):
             ax1.grid(axis="y",linestyle="--",alpha=0.25)
             fig.tight_layout()
 
-        # ── Fig 7: Bus factor + knowledge silos ────────────────────────────────
+        # ── Fig 7: Bus factor ─────────────────────────────────────────────────
         elif script_id == "busactor":
             import matplotlib.patches as mpatches
             data = _load_json("busactor_results.json")
@@ -348,15 +347,14 @@ def generate_chart_for(script_id):
             s_files  = [s["file"].replace("src/","") for s in silos]
             s_own    = [s["ownership_pct"] for s in silos]
             s_colors = [P["red"] if p>=85 else P["amber"] if p>=70 else P["orange"] for p in s_own]
-
             fig,(ax1,ax2)=plt.subplots(1,2,figsize=(12,4.5))
             x=np.arange(len(names))
             ax1.barh(x,all_c,0.38,label="All-time",color=P["blue"],alpha=0.85)
             ax1.barh(x+0.38,rec_c,0.38,label="2022-2024",color=P["orange"],alpha=0.85)
             ax1.set_yticks(x+0.19); ax1.set_yticklabels(names,fontsize=7.5); ax1.invert_yaxis()
-            ax1.set_xlabel("Commit count"); ax1.set_title("Top contributor commit counts",fontweight="bold",fontsize=9)
+            ax1.set_xlabel("Commit count")
+            ax1.set_title("Top contributor commit counts",fontweight="bold",fontsize=9)
             ax1.legend(fontsize=7,labelcolor="#9095ad")
-            # bus factor line
             total=sum(c["commits_all"] for c in data["contributors"])
             running=0
             for i,c in enumerate(sorted(all_c,reverse=True)):
@@ -367,7 +365,6 @@ def generate_chart_for(script_id):
                     break
             ax1.spines["top"].set_visible(False); ax1.spines["right"].set_visible(False)
             ax1.grid(axis="x",linestyle="--",alpha=0.25)
-
             ax2.barh(s_files,s_own,color=s_colors,alpha=0.85,edgecolor="#1e2235",linewidth=0.4)
             ax2.set_xlabel("Single-author ownership (%)")
             ax2.set_title("Knowledge silos: single-author file ownership",fontweight="bold",fontsize=9)
@@ -384,19 +381,20 @@ def generate_chart_for(script_id):
         else:
             return None, f"no chart generator for {script_id}"
 
-        out_path = BASE / out_file
-        fig.savefig(str(out_path), facecolor=DARK_BG, bbox_inches="tight")
+        # ── Save to in-memory buffer — NO disk write ──────────────────────────
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", facecolor=DARK_BG, bbox_inches="tight")
         plt.close(fig)
-
-        # Verify file was actually written
-        if not out_path.exists() or out_path.stat().st_size == 0:
-            return None, f"chart file was not written: {out_path}"
-
-        return out_file, None
+        buf.seek(0)
+        return buf.getvalue(), None
 
     except Exception as e:
         import traceback
+        if fig is not None:
+            try: plt.close(fig)
+            except: pass
         return None, f"{e}\n{traceback.format_exc()}"
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def _load_json(fname):
@@ -411,25 +409,11 @@ def load_json_gated(fname, script_id):
         return None
     return _load_json(fname)
 
-def _read_image_bytes(path):
-    """Read image as raw bytes — bypasses Streamlit's widget cache so newly
-    written files always appear without a second rerun."""
-    with open(str(path), "rb") as f:
-        return f.read()
-
-def _read_file_bytes(path):
-    """Read any file as raw bytes."""
-    with open(str(path), "rb") as f:
-        return f.read()
-
 def delete_all_outputs():
     for files in OUTPUT_FILES.values():
         for f in files:
             p = BASE / f
             if p.exists(): p.unlink()
-    for f in SCRIPT_CHART_MAP.values():
-        p = BASE / f
-        if p.exists(): p.unlink()
 
 def run_script(script_info, py=sys.executable):
     script_path = BASE / script_info["file"]
@@ -438,19 +422,21 @@ def run_script(script_info, py=sys.executable):
     result = subprocess.run([py, str(script_path)], capture_output=True, text=True, cwd=str(BASE))
     return result.returncode == 0, result.stdout + result.stderr
 
+
 # ── Session state ─────────────────────────────────────────────────────────────
-if "run_log"  not in st.session_state: st.session_state.run_log  = []
-if "statuses" not in st.session_state: st.session_state.statuses = {s["id"]: "idle" for s in SCRIPTS}
-if "ran_ids"  not in st.session_state: st.session_state.ran_ids  = set()
-# Store chart bytes in session state so they survive reruns without re-reading disk
-if "chart_bytes"  not in st.session_state: st.session_state.chart_bytes  = {}
-# Store PDF bytes in session state
-if "pdf_bytes"    not in st.session_state: st.session_state.pdf_bytes    = None
-if "pdf_size_kb"  not in st.session_state: st.session_state.pdf_size_kb  = 0
+if "run_log"     not in st.session_state: st.session_state.run_log     = []
+if "statuses"    not in st.session_state: st.session_state.statuses    = {s["id"]: "idle" for s in SCRIPTS}
+if "ran_ids"     not in st.session_state: st.session_state.ran_ids     = set()
+# chart_bytes: dict[script_id -> PNG bytes] — populated right after chart generation
+if "chart_bytes" not in st.session_state: st.session_state.chart_bytes = {}
+# pdf_bytes: raw bytes of the generated PDF — populated right after build_report.py
+if "pdf_bytes"   not in st.session_state: st.session_state.pdf_bytes   = None
+if "pdf_size_kb" not in st.session_state: st.session_state.pdf_size_kb = 0
 
 if "initialised" not in st.session_state:
     delete_all_outputs()
     st.session_state.initialised = True
+
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -474,17 +460,19 @@ with st.sidebar:
     st.code(str(BASE), language=None)
 
     if st.button("Clear and Reset", use_container_width=True):
-        st.session_state.run_log    = []
-        st.session_state.statuses   = {s["id"]: "idle" for s in SCRIPTS}
-        st.session_state.ran_ids    = set()
+        st.session_state.run_log     = []
+        st.session_state.statuses    = {s["id"]: "idle" for s in SCRIPTS}
+        st.session_state.ran_ids     = set()
         st.session_state.chart_bytes = {}
-        st.session_state.pdf_bytes  = None
+        st.session_state.pdf_bytes   = None
         st.session_state.pdf_size_kb = 0
         delete_all_outputs()
         st.rerun()
 
+
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_run, tab_results, tab_charts, tab_report = st.tabs(["Runner", "Results", "Charts", "Report"])
+
 
 # ══════════════════════════════════════════════════════════
 # TAB 1 — RUNNER
@@ -532,16 +520,11 @@ with tab_run:
             total       = len(selected)
 
             for idx, s in enumerate(selected):
-                # Clean old outputs for this script
+                # Clean old outputs and cached data for this script
                 for f in OUTPUT_FILES.get(s["id"], []):
                     p = BASE / f
                     if p.exists(): p.unlink()
-                chart_file = SCRIPT_CHART_MAP.get(s["id"])
-                if chart_file:
-                    p = BASE / chart_file
-                    if p.exists(): p.unlink()
-                    # Remove cached bytes for this chart
-                    st.session_state.chart_bytes.pop(s["id"], None)
+                st.session_state.chart_bytes.pop(s["id"], None)
                 if s["id"] == "report":
                     st.session_state.pdf_bytes   = None
                     st.session_state.pdf_size_kb = 0
@@ -566,26 +549,23 @@ with tab_run:
                     st.session_state.ran_ids.add(s["id"])
 
                     if s["id"] == "report":
-                        # ── Read PDF bytes immediately into session state ──────
+                        # Read PDF bytes immediately — before any rerun
                         pdf_path = BASE / "redis_architecture_report.pdf"
                         if pdf_path.exists() and pdf_path.stat().st_size > 0:
-                            st.session_state.pdf_bytes   = _read_file_bytes(pdf_path)
+                            with open(str(pdf_path), "rb") as pf:
+                                st.session_state.pdf_bytes = pf.read()
                             st.session_state.pdf_size_kb = pdf_path.stat().st_size / 1024
                             log_lines.append(f"  PDF ready: {st.session_state.pdf_size_kb:.0f} KB")
                         else:
-                            log_lines.append("  WARNING: PDF file not found or empty after build_report.py ran")
+                            log_lines.append("  WARNING: PDF not found or empty after build_report.py")
                     else:
-                        # ── Generate chart and read bytes into session state ───
-                        chart_out, chart_err = generate_chart_for(s["id"])
-                        if chart_out:
-                            chart_path = BASE / chart_out
-                            if chart_path.exists():
-                                st.session_state.chart_bytes[s["id"]] = _read_image_bytes(chart_path)
-                                log_lines.append(f"  chart generated: {chart_out}")
-                            else:
-                                log_lines.append(f"  chart file missing after generation: {chart_out}")
-                        elif chart_err:
-                            log_lines.append(f"  chart skipped: {chart_err}")
+                        # Generate chart into memory — no disk write, no race condition
+                        png_bytes, chart_err = generate_chart_bytes(s["id"])
+                        if png_bytes:
+                            st.session_state.chart_bytes[s["id"]] = png_bytes
+                            log_lines.append(f"  chart rendered: {SCRIPT_CHART_MAP[s['id']]}")
+                        else:
+                            log_lines.append(f"  chart failed: {chart_err}")
 
                     log_lines.append(f"  completed: {s['file']}")
                 else:
@@ -617,6 +597,7 @@ with tab_run:
             'Select scripts in the sidebar and click Run Selected Scripts</div>',
             unsafe_allow_html=True)
 
+
 # ══════════════════════════════════════════════════════════
 # TAB 2 — RESULTS
 # ══════════════════════════════════════════════════════════
@@ -625,7 +606,6 @@ with tab_results:
     def placeholder(msg):
         st.markdown(f'<div class="placeholder-box">Run {msg} to see results here</div>', unsafe_allow_html=True)
 
-    # LOC
     loc = load_json_gated("loc_results.json", "loc")
     st.markdown('<div class="section-header">Lines of Code and COCOMO</div>', unsafe_allow_html=True)
     if loc:
@@ -646,13 +626,11 @@ with tab_results:
 
     st.markdown("---")
 
-    # Complexity
     cplx = load_json_gated("complexity_results.json", "complexity")
     st.markdown('<div class="section-header">Cyclomatic Complexity and MI</div>', unsafe_allow_html=True)
     if cplx:
         import pandas as pd
         dist = cplx["cc_distribution"]
-        avg_mi = cplx["avg_mi"]
         st.markdown(f"""<div class="metric-grid">
             <div class="metric-card"><div class="metric-value">{dist['low']}</div><div class="metric-label">Low CC (1-10)</div></div>
             <div class="metric-card"><div class="metric-value">{dist['medium']}</div><div class="metric-label">Medium CC (11-20)</div></div>
@@ -668,7 +646,6 @@ with tab_results:
 
     st.markdown("---")
 
-    # Velocity
     vel = load_json_gated("velocity_results.json", "velocity")
     st.markdown('<div class="section-header">Issue Velocity and Community Health</div>', unsafe_allow_html=True)
     if vel:
@@ -687,7 +664,6 @@ with tab_results:
 
     st.markdown("---")
 
-    # Coupling
     coup = load_json_gated("coupling_results.json", "coupling")
     st.markdown('<div class="section-header">Module Coupling</div>', unsafe_allow_html=True)
     if coup:
@@ -707,7 +683,6 @@ with tab_results:
 
     st.markdown("---")
 
-    # Churn
     churn = load_json_gated("churn_results.json", "churn")
     st.markdown('<div class="section-header">Code Churn and Defect Hotspots</div>', unsafe_allow_html=True)
     if churn:
@@ -730,7 +705,6 @@ with tab_results:
 
     st.markdown("---")
 
-    # Coverage
     cov = load_json_gated("coverage_results.json", "coverage")
     st.markdown('<div class="section-header">Test Coverage and Security Surface</div>', unsafe_allow_html=True)
     if cov:
@@ -751,7 +725,6 @@ with tab_results:
 
     st.markdown("---")
 
-    # Bus factor
     bus = load_json_gated("busactor_results.json", "busactor")
     st.markdown('<div class="section-header">Bus Factor and Contributor Concentration</div>', unsafe_allow_html=True)
     if bus:
@@ -769,6 +742,7 @@ with tab_results:
     else:
         placeholder("script 07 — Bus Factor and Contributor Concentration")
 
+
 # ══════════════════════════════════════════════════════════
 # TAB 3 — CHARTS
 # ══════════════════════════════════════════════════════════
@@ -782,7 +756,7 @@ with tab_charts:
         script_title = next((s["title"] for s in SCRIPTS if s["id"] == src_id), src_id)
 
         with col:
-            # ── FIX: serve from session_state bytes, not disk path ─────────────
+            # Read from session state bytes — works on local AND deployed, first run
             img_bytes = st.session_state.chart_bytes.get(src_id)
             if src_id in st.session_state.ran_ids and img_bytes:
                 st.image(img_bytes, use_container_width=True)
@@ -798,13 +772,14 @@ with tab_charts:
                     </div>
                 </div>""", unsafe_allow_html=True)
 
+
 # ══════════════════════════════════════════════════════════
 # TAB 4 — REPORT
 # ══════════════════════════════════════════════════════════
 with tab_report:
     st.markdown('<div class="section-header">PDF Report</div>', unsafe_allow_html=True)
 
-    # ── FIX: serve from session_state bytes, not live disk path ───────────────
+    # Read entirely from session state — no disk path lookup after rerun
     pdf_bytes   = st.session_state.pdf_bytes
     pdf_size_kb = st.session_state.pdf_size_kb
 
